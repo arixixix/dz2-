@@ -1,0 +1,115 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include "windows.h"
+
+using namespace std;
+
+void encrypt(string namefile, int key) {
+    string message;
+    cout << "Enter message: ";
+    cin >> message;// вводим сообщение
+    srand(key);
+    unsigned int left = 1;// на какое кол-во битов необходимо сдвинуть
+    const char *data = message.data();// возвращем массив байт
+    int size = message.size();//находим размер текста
+
+    //переводим массив в вектор
+    vector<char> bytes(size);
+    for (int i = 0; size > i; i++) {
+        bytes[i] = data[i];
+    }
+    ofstream outputfile;
+    outputfile.open(namefile, ios::binary);//файл в который будет записывать зашифр. текст
+    for (int i = 0; i < bytes.size(); i += 2) {
+        unsigned int gamma = rand();//инициализируем гамму
+
+        //разбиваем сообщение по двум байтам
+        unsigned char b1 = bytes[i];
+        unsigned char b2 = i + 1 < bytes.size() ? bytes[i + 1]
+                                                : 0u;//провиряем, чтобы не выходила за рамки вектора, если выходит, делаем второй байт 0
+        static_cast<unsigned int>(b1);// преобразуем b1 в int
+        static_cast<unsigned int>(b2);//преобразуем b2 в int
+        unsigned int zdvig =
+                static_cast<unsigned int>(b1) << 8u;//сдвиагем значение, для последующего склеивания двух значений
+        unsigned int skley = zdvig | static_cast<unsigned int>(b2);// склеиваем два значения
+        unsigned int message_gamma = skley ^gamma;// накладываем гамму
+        unsigned int block =
+                (message_gamma << left) | (message_gamma & 0xffff) >> (16 - left);//циклически сдвигаем влево
+        //делим дальше на два байта
+        char r1 = block >> 8;
+        char r2 = block;
+        outputfile.write(&r1, sizeof(r1));
+        outputfile.write(&r2, sizeof(r2));
+    }
+    outputfile.close();
+
+
+}
+
+void decryption(string namefile, int key) {
+    srand(key);
+    ifstream readFile;
+    readFile.open(namefile, ios::binary);
+    //читаем из файла
+    vector<char> encrypt((std::istreambuf_iterator<char>(readFile)),
+                         std::istreambuf_iterator<char>());
+    readFile.close();
+
+    vector<char> decrypt(encrypt.size());//создаем вектор для расшифровки
+
+    for (int i = 0; i < encrypt.size(); i += 2) {
+        unsigned int gamma = rand();//инициализируем гамму
+
+        //делим на два байта
+        unsigned char b1 = encrypt[i];
+        unsigned char b2 = i + 1 < encrypt.size() ? encrypt[i + 1] : 0u;
+
+        unsigned int zdvig1 = static_cast<unsigned int>(b1) << 8u;// сдвигаем, для последующего склеивания
+        unsigned int skley1 =
+                ((zdvig1) | static_cast<unsigned int>(b2));//склеиваем
+
+        unsigned int zdvig_block =
+                ((skley1 & 0xFFFF) >> 1) | skley1 << (16 - 1);//сдвигаем в обратную сторону
+
+        unsigned int result =
+                zdvig_block ^gamma;//накладываем гамму
+
+        unsigned char r1 = result >> 8;
+        unsigned char r2 = result;
+
+        //кладем значение в вектор
+        decrypt[i] = r1;
+        decrypt[i + 1] = r2;
+    }
+
+    //выводим результат
+    for (unsigned int i = 0; i < decrypt.size(); i++) {
+        std::cout << decrypt[i];
+    }
+}
+
+
+int main(int argc, const char *argv[]) {
+    setlocale(LC_ALL, "Russian");
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
+    string mode, message;
+    unsigned int key;
+    cout << "Key: ";
+    cin >> key;
+    cout << "Enter encryption or decryption: ";
+    cin >> mode;
+    string namefile;
+    cout << "Enter namefile: ";
+    cin >> namefile;
+    if (mode == "e") {
+        encrypt(namefile, key);
+
+    }
+    if (mode == "d") {
+        decryption(namefile, key);
+    }
+    return 0;
+}
